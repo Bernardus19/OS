@@ -1,0 +1,97 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <unistd.h>
+
+int *buffer;
+int buffer_size;
+int in = 0, out = 0;
+
+// Deklarasi Mutex dan semaphore
+pthread_mutex_t key;
+sem_t empty;
+sem_t full;
+
+int total_items_per_producer;
+
+int generate_item() {
+    return rand() % 100;
+}
+
+void* producer(void* arg) {
+    int id = *((int*)arg);
+    for (int i = 0; i < total_items_per_producer; i++) {
+        int item = generate_item()  // data yang akan diproduksi
+
+        sem_wait(&empty);       // code untuk menunggu jika ada antrian
+        pthread_mutex_lock(&key);       // Mengunci akses ke buffer
+
+        buffer[in] = item;
+        printf("Producer %d produced %d at index %d\n", id, item, in);
+        in = (in + 1) % buffer_size;
+
+        pthread_mutex_unlock(&key); // untuk melepas kunci akses ke buffer
+        sem_post(&full);        // menambah jumlah item ke buffer
+        sleep(1);
+    }
+    pthread_exit(NULL);
+}
+
+void* consumer(void* arg) {
+    int id = *((int*)arg);
+    while (1) {
+        sem_wait(&full);        // untuk menunggu jika buffer kosong
+        pthread_mutex_lock(&key); // Mengunci akses ke buffer
+
+        int item = buffer[out];
+        printf("Consumer %d consumed %d at index %d\n", id, item, out);
+        out = (out + 1) % buffer_size;
+
+        pthread_mutex_unlock(&key);  // melepas kunci
+        sem_post(&empty); //tambah slot kosong
+        sleep(2);
+    }
+    pthread_exit(NULL);
+}
+int main() {
+    int num_producers, num_consumers;
+
+    printf("Enter buffer size: ");
+    scanf("%d", &buffer_size);
+
+    printf("Enter number of producers: ");
+    scanf("%d", &num_producers);
+
+    printf("Enter number of consumers: ");
+    scanf("%d", &num_consumers);
+
+    printf("Enter number of items each producer should produce: ");
+    scanf("%d", &total_items_per_producer);
+
+    buffer = (int*)malloc(sizeof(int) * buffer_size);
+
+    pthread_t producers[num_producers], consumers[num_consumers];
+    int producer_ids[num_producers];
+    int consumer_ids[num_consumers];
+
+    pthread_mutex_init(&mutex, NULL);
+    sem_init(&empty, 0, buffer_size);
+    sem_init(&full, 0, 0);
+
+    for (int i = 0; i < num_producers; i++) {
+        producer_ids[i] = i + 1;
+        pthread_create(&producers[i], NULL, producer, &producer_ids[i]);
+    }
+
+    for (int i = 0; i < num_consumers; i++) {
+        consumer_ids[i] = i + 1;
+        pthread_create(&consumers[i], NULL, consumer, &consumer_ids[i]);
+    }
+
+    for (int i = 0; i < num_producers; i++) {
+        pthread_join(producers[i], NULL);
+    }
+
+    return 0;
+}
