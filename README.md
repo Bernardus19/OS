@@ -1,1 +1,2 @@
-# OS
+cara menjalankan file uas 
+
